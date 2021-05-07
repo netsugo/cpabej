@@ -266,7 +266,6 @@ public class SerializeUtils {
     }
 
     private static void byteArrListAppend(ArrayList<Byte> list, byte[] b) {
-        int len = b.length;
         for (byte value : b) list.add(value);
     }
 

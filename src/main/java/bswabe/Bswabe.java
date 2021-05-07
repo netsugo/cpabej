@@ -10,7 +10,11 @@ import java.io.ByteArrayInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 public class Bswabe {
 
@@ -120,18 +124,15 @@ public class Bswabe {
      * Delegate a subset of attribute of an existing private key.
      */
     public static BswabePrv delegate(BswabePub pub, BswabePrv prv_src, String[] attrs_subset) throws NoSuchAlgorithmException, IllegalArgumentException {
-
         BswabePrv prv = new BswabePrv();
-        Element g_rt, rt, f_at_rt;
-        Pairing pairing;
 
         /* initialize */
-        pairing = pub.p;
+        Pairing pairing = pub.p;
         prv.d = pairing.getG2().newElement();
 
-        g_rt = pairing.getG2().newElement();
-        rt = pairing.getZr().newElement();
-        f_at_rt = pairing.getZr().newElement();
+        Element g_rt = pairing.getG2().newElement();
+        Element rt = pairing.getZr().newElement();
+        Element f_at_rt = pairing.getZr().newElement();
 
         /* compute */
         rt.setToRandom();
@@ -147,19 +148,15 @@ public class Bswabe {
 
         for (String s : attrs_subset) {
             BswabePrvComp comp = new BswabePrvComp();
-            Element h_rtp;
-            Element rtp;
-
             comp.attr = s;
 
             BswabePrvComp comp_src = new BswabePrvComp();
             boolean comp_src_init = false;
 
-            for (int j = 0; j < prv_src.comps.size(); ++j) {
-                if (prv_src.comps.get(j).attr.equals(comp.attr)) {
-                    comp_src = prv_src.comps.get(j);
+            for (BswabePrvComp bswabePrvComp : prv_src.comps) {
+                if (bswabePrvComp.attr.equals(comp.attr)) {
+                    comp_src = bswabePrvComp;
                     comp_src_init = true;
-                    break;
                 }
             }
 
@@ -167,8 +164,8 @@ public class Bswabe {
 
             comp.d = pairing.getG2().newElement();
             comp.dp = pairing.getG1().newElement();
-            h_rtp = pairing.getG2().newElement();
-            rtp = pairing.getZr().newElement();
+            Element h_rtp = pairing.getG2().newElement();
+            Element rtp = pairing.getZr().newElement();
 
             elementFromString(h_rtp, comp.attr);
             rtp.setToRandom();
@@ -214,8 +211,7 @@ public class Bswabe {
      * Returns null if an error occured, in which case a description can be
      * retrieved by calling bswabe_error().
      */
-    public static BswabeCphKey enc(BswabePub pub, String policy)
-            throws Exception {
+    public static BswabeCphKey encrypt(BswabePub pub, String policy) throws ParseException, NoSuchAlgorithmException {
         BswabeCphKey keyCph = new BswabeCphKey();
         BswabeCph cph = new BswabeCph();
 
@@ -249,25 +245,17 @@ public class Bswabe {
     /*
      * Decrypt the specified ciphertext using the given private key, filling in
      * the provided element m (which need not be initialized) with the result.
-     *
-     * Returns true if decryption succeeded, false if this key does not satisfy
-     * the policy of the ciphertext (in which case m is unaltered).
      */
-    public static BswabeElementBoolean dec(BswabePub pub, BswabePrv prv, BswabeCph cph) {
-        BswabeElementBoolean beb = new BswabeElementBoolean();
-
+    public static Element decrypt(BswabePub pub, BswabePrv prv, BswabeCph cph) {
         Element m = pub.p.getGT().newElement();
         Element t = pub.p.getGT().newElement();
 
         checkSatisfy(cph.p, prv);
         if (!cph.p.satisfiable) {
-            System.err.println("cannot decrypt, attributes in key do not satisfy policy");
-            beb.e = null;
-            beb.b = false;
-            return beb;
+            throw new RuntimeException("Attributes in key do not satisfy policy");
         }
 
-        pickSatisfyMinLeaves(cph.p, prv);
+        pickSatisfyMinLeaves(cph.p);
 
         decFlatten(t, cph.p, prv, pub);
 
@@ -278,10 +266,7 @@ public class Bswabe {
         t.invert();
         m.mul(t); /* num_muls++; */
 
-        beb.e = m;
-        beb.b = true;
-
-        return beb;
+        return m;
     }
 
     private static void decFlatten(Element r, BswabePolicy p, BswabePrv prv, BswabePub pub) {
@@ -317,12 +302,13 @@ public class Bswabe {
     private static void decInternalFlatten(Element r, Element exp, BswabePolicy p, BswabePrv prv, BswabePub pub) {
         Element t = pub.p.getZr().newElement();
         Element expnew = pub.p.getZr().newElement();
+        ArrayList<Integer> satl = p.satl;
 
-        for (int i = 0; i < p.satl.size(); i++) {
-            lagrangeCoef(t, p.satl, p.satl.get(i));
+        for (Integer sat : satl) {
+            lagrangeCoef(t, satl, sat);
             expnew = exp.duplicate();
             expnew.mul(t);
-            decNodeFlatten(r, expnew, p.children[p.satl.get(i) - 1], prv, pub);
+            decNodeFlatten(r, expnew, p.children[sat - 1], prv, pub);
         }
     }
 
@@ -331,34 +317,30 @@ public class Bswabe {
         Element t = r.duplicate();
 
         r.setToOne();
-        for (int j : s) {
-            if (j == i)
-                continue;
+        s.stream().filter(j -> j != i).forEach(j -> {
             t.set(-j);
             r.mul(t); /* num_muls++; */
             t.set(i - j);
             t.invert();
             r.mul(t); /* num_muls++; */
-        }
+        });
     }
 
-    private static void pickSatisfyMinLeaves(BswabePolicy p, BswabePrv prv) {
-        ArrayList<Integer> c = new ArrayList<Integer>();
-
+    private static void pickSatisfyMinLeaves(BswabePolicy p) {
         if (p.children == null || p.children.length == 0)
             p.min_leaves = 1;
         else {
             int len = p.children.length;
-            for (int i = 0; i < len; i++)
-                if (p.children[i].satisfiable)
-                    pickSatisfyMinLeaves(p.children[i], prv);
 
-            for (int i = 0; i < len; i++)
-                c.add(i);
+            Arrays.stream(p.children)
+                    .filter(policy -> policy.satisfiable)
+                    .forEach(Bswabe::pickSatisfyMinLeaves);
 
-            c.sort(new IntegerComparator(p));
+            List<Integer> c = IntStream.range(0, len).boxed()
+                    .sorted(new IntegerComparator(p))
+                    .collect(Collectors.toList());
 
-            p.satl = new ArrayList<Integer>();
+            p.satl = new ArrayList<>();
             p.min_leaves = 0;
             int l = 0;
 
@@ -379,23 +361,19 @@ public class Bswabe {
         if (p.children == null || p.children.length == 0) {
             for (int i = 0; i < prv.comps.size(); i++) {
                 String prvAttr = prv.comps.get(i).attr;
-                // System.out.println("prvAtt:" + prvAttr);
-                // System.out.println("p.attr" + p.attr);
                 if (prvAttr.compareTo(p.attr) == 0) {
-                    // System.out.println("=staisfy=");
                     p.satisfiable = true;
                     p.attri = i;
                     break;
                 }
             }
         } else {
-            for (int i = 0; i < p.children.length; i++)
-                checkSatisfy(p.children[i], prv);
+            Arrays.stream(p.children)
+                    .forEach(policy -> checkSatisfy(policy, prv));
 
-            int l = 0;
-            for (int i = 0; i < p.children.length; i++)
-                if (p.children[i].satisfiable)
-                    l++;
+            int l = (int) Arrays.stream(p.children)
+                    .filter(policy -> policy.satisfiable)
+                    .count();
 
             if (l >= p.k)
                 p.satisfiable = true;
@@ -465,41 +443,32 @@ public class Bswabe {
         return q;
     }
 
-    private static BswabePolicy parsePolicyPostfix(String s) throws Exception {
+    private static BswabePolicy parsePolicyPostfix(String s) throws ParseException {
         ArrayList<BswabePolicy> stack = new ArrayList<>();
-        BswabePolicy root;
-
-        for (String tok : s.split("\\s+")) {
+        List<String> splitPolicy = Arrays.stream(s.split("\\s+"))
+                .filter(tok -> !tok.isEmpty())
+                .collect(Collectors.toList());
+        for (String tok : splitPolicy) {
             if (!tok.contains("of")) {
                 stack.add(baseNode(1, tok));
             } else {
-                BswabePolicy node;
-
                 /* parse kof n node */
                 String[] k_n = tok.split("of");
                 int k = Integer.parseInt(k_n[0]);
                 int n = Integer.parseInt(k_n[1]);
 
                 if (k < 1) {
-                    System.out.println("error parsing " + s
-                            + ": trivially satisfied operator " + tok);
-                    return null;
+                    throw ParseException.create(s, "trivially satisfied operator", tok);
                 } else if (k > n) {
-                    System.out.println("error parsing " + s
-                            + ": unsatisfiable operator " + tok);
-                    return null;
+                    throw ParseException.create(s, "unsatisfiable operator", tok);
                 } else if (n == 1) {
-                    System.out.println("error parsing " + s
-                            + ": indentity operator " + tok);
-                    return null;
+                    throw ParseException.create(s, "indentity operator", tok);
                 } else if (n > stack.size()) {
-                    System.out.println("error parsing " + s
-                            + ": stack underflow at " + tok);
-                    return null;
+                    throw ParseException.create(s, "stack underflow at");
                 }
 
                 /* pop n things and fill in children */
-                node = baseNode(k, null);
+                BswabePolicy node = baseNode(k, null);
                 node.children = new BswabePolicy[n];
 
                 for (int i = n - 1; i >= 0; i--)
@@ -511,16 +480,12 @@ public class Bswabe {
         }
 
         if (stack.size() > 1) {
-            System.out.println("error parsing " + s
-                    + ": extra node left on the stack");
-            return null;
+            throw ParseException.create(s, "extra node left on the stack");
         } else if (stack.size() < 1) {
-            System.out.println("error parsing " + s + ": empty policy");
-            return null;
+            throw ParseException.create(s, "empty policy");
         }
 
-        root = stack.get(0);
-        return root;
+        return stack.get(0);
     }
 
     private static BswabePolicy baseNode(int k, String s) {
@@ -533,8 +498,7 @@ public class Bswabe {
         return p;
     }
 
-    private static void elementFromString(Element h, String s)
-            throws NoSuchAlgorithmException {
+    private static void elementFromString(Element h, String s) throws NoSuchAlgorithmException {
         MessageDigest md = MessageDigest.getInstance("SHA-1");
         byte[] digest = md.digest(s.getBytes());
         h.setFromHash(digest, 0, digest.length);

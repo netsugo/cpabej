@@ -46,17 +46,20 @@ public class Cpabe {
         }
     }
 
-    public byte[] encrypt(byte[] publicKey, String policy, byte[] plain) throws Exception {
+    public byte[] encrypt(byte[] publicKey, String policy, byte[] plain) throws EncryptException {
         BswabePub pub = SerializeUtils.unserializeBswabePub(publicKey);
-        BswabeCphKey keyCph = Bswabe.enc(pub, policy);
-        BswabeCph cph = keyCph.cph;
-        Element element = keyCph.key;
-        if (cph == null) {
-            throw new RuntimeException("Error happened while encrypting");
-        } else {
+
+        try {
+            BswabeCphKey keyCph = Bswabe.encrypt(pub, policy);
+            BswabeCph cph = keyCph.cph;
+            Element element = keyCph.key;
+
             byte[] cphBuf = SerializeUtils.bswabeCphSerialize(cph);
             byte[] aesBuf = AESCoder.encrypt(element.toBytes(), plain);
+
             return packCpabe(cphBuf, aesBuf);
+        } catch (Exception e) {
+            throw new EncryptException(e.getMessage(), e.getCause());
         }
     }
 
@@ -66,22 +69,22 @@ public class Cpabe {
         }
     }
 
-    public byte[] decrypt(byte[] publicKey, byte[] privateKey, byte[] encrypted) throws Exception {
+    public byte[] decrypt(byte[] publicKey, byte[] privateKey, byte[] encrypted) throws DecryptException {
         int BUF_AES = 0;
         int BUF_CPH = 1;
-        byte[][] tmp = UnpackCpabe(encrypted);
-        byte[] aesBuf = tmp[BUF_AES];
-        byte[] cphBuf = tmp[BUF_CPH];
-        BswabePub pub = SerializeUtils.unserializeBswabePub(publicKey);
-        BswabeCph cph = SerializeUtils.bswabeCphUnserialize(pub, cphBuf);
-        BswabePrv prv = SerializeUtils.unserializeBswabePrv(pub, privateKey);
 
-        BswabeElementBoolean beb = Bswabe.dec(pub, prv, cph);
+        try {
+            byte[][] tmp = UnpackCpabe(encrypted);
+            byte[] aesBuf = tmp[BUF_AES];
+            byte[] cphBuf = tmp[BUF_CPH];
+            BswabePub pub = SerializeUtils.unserializeBswabePub(publicKey);
+            BswabeCph cph = SerializeUtils.bswabeCphUnserialize(pub, cphBuf);
+            BswabePrv prv = SerializeUtils.unserializeBswabePrv(pub, privateKey);
 
-        if (beb.b) {
-            return AESCoder.decrypt(beb.e.toBytes(), aesBuf);
-        } else {
-            throw new RuntimeException("Decrypt error: " + beb.e.toString());
+            Element e = Bswabe.decrypt(pub, prv, cph);
+            return AESCoder.decrypt(e.toBytes(), aesBuf);
+        } catch (Exception e) {
+            throw new DecryptException(e.getMessage(), e.getCause());
         }
     }
 }
