@@ -17,8 +17,8 @@ public class Cpabe {
      * @author Junwei Wang(wakemecn@gmail.com)
      */
 
-    public final int SETUP_PUBLIC = 0;
-    public final int SETUP_MASTER = 1;
+    public static final int SETUP_PUBLIC = 0;
+    public static final int SETUP_MASTER = 1;
 
     public byte[][] setup() {
         BswabePub pub = new BswabePub();
@@ -140,7 +140,7 @@ public class Cpabe {
         return Common.readCpabeData(inputStream);
     }
 
-    public byte[] decode(byte[] publicKey, byte[] privateKey, byte[] encrypted) throws Exception {
+    public byte[] decrypt(byte[] publicKey, byte[] privateKey, byte[] encrypted) throws Exception {
         int BUF_AES = 0;
         int BUF_CPH = 1;
         byte[][] tmp = UnpackCpabe(encrypted);
