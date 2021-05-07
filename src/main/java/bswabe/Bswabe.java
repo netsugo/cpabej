@@ -10,7 +10,6 @@ import java.io.ByteArrayInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 
 public class Bswabe {
@@ -19,7 +18,7 @@ public class Bswabe {
      * Generate a public key and corresponding master secret key.
      */
 
-    private static String curveParams = "type a\n"
+    private static final String curveParams = "type a\n"
             + "q 87807107996633125224377819847540498158068831994142082"
             + "1102865339926647563088022295707862517942266222142315585"
             + "8769582317459277713367317481324925129998224791\n"
@@ -29,7 +28,7 @@ public class Bswabe {
             + "exp2 159\n" + "exp1 107\n" + "sign1 1\n" + "sign0 1\n";
 
     public static void setup(BswabePub pub, BswabeMsk msk) {
-        Element alpha, beta_inv;
+        // Element alpha, beta_inv;
 
         CurveParameters params = new DefaultCurveParameters()
                 .load(new ByteArrayInputStream(curveParams.getBytes()));
@@ -43,7 +42,7 @@ public class Bswabe {
         pub.h = pairing.getG1().newElement();
         pub.gp = pairing.getG2().newElement();
         pub.g_hat_alpha = pairing.getGT().newElement();
-        alpha = pairing.getZr().newElement();
+        Element alpha = pairing.getZr().newElement();
         msk.beta = pairing.getZr().newElement();
         msk.g_alpha = pairing.getG2().newElement();
 
@@ -55,7 +54,7 @@ public class Bswabe {
         msk.g_alpha = pub.gp.duplicate();
         msk.g_alpha.powZn(alpha);
 
-        beta_inv = msk.beta.duplicate();
+        Element beta_inv = msk.beta.duplicate();
         beta_inv.invert();
         pub.f = pub.g.duplicate();
         pub.f.powZn(beta_inv);
@@ -72,15 +71,13 @@ public class Bswabe {
     public static BswabePrv keygen(BswabePub pub, BswabeMsk msk, String[] attrs)
             throws NoSuchAlgorithmException {
         BswabePrv prv = new BswabePrv();
-        Element g_r, r, beta_inv;
-        Pairing pairing;
 
         /* initialize */
-        pairing = pub.p;
+        Pairing pairing = pub.p;
         prv.d = pairing.getG2().newElement();
-        g_r = pairing.getG2().newElement();
-        r = pairing.getZr().newElement();
-        beta_inv = pairing.getZr().newElement();
+        Element g_r = pairing.getG2().newElement();
+        Element r = pairing.getZr().newElement();
+        Element beta_inv = pairing.getZr().newElement();
 
         /* compute */
         r.setToRandom();
@@ -93,19 +90,15 @@ public class Bswabe {
         beta_inv.invert();
         prv.d.powZn(beta_inv);
 
-        int i, len = attrs.length;
-        prv.comps = new ArrayList<BswabePrvComp>();
-        for (i = 0; i < len; i++) {
+        prv.comps = new ArrayList<>();
+        for (String attr : attrs) {
             BswabePrvComp comp = new BswabePrvComp();
-            Element h_rp;
-            Element rp;
-
-            comp.attr = attrs[i];
+            comp.attr = attr;
 
             comp.d = pairing.getG2().newElement();
             comp.dp = pairing.getG1().newElement();
-            h_rp = pairing.getG2().newElement();
-            rp = pairing.getZr().newElement();
+            Element h_rp = pairing.getG2().newElement();
+            Element rp = pairing.getZr().newElement();
 
             elementFromString(h_rp, comp.attr);
             rp.setToRandom();
@@ -126,8 +119,7 @@ public class Bswabe {
     /*
      * Delegate a subset of attribute of an existing private key.
      */
-    public static BswabePrv delegate(BswabePub pub, BswabePrv prv_src, String[] attrs_subset)
-            throws NoSuchAlgorithmException, IllegalArgumentException {
+    public static BswabePrv delegate(BswabePub pub, BswabePrv prv_src, String[] attrs_subset) throws NoSuchAlgorithmException, IllegalArgumentException {
 
         BswabePrv prv = new BswabePrv();
         Element g_rt, rt, f_at_rt;
@@ -151,30 +143,27 @@ public class Bswabe {
         g_rt = pub.g.duplicate();
         g_rt.powZn(rt);
 
-        int i, len = attrs_subset.length;
-        prv.comps = new ArrayList<BswabePrvComp>();
+        prv.comps = new ArrayList<>();
 
-        for (i = 0; i < len; i++) {
+        for (String s : attrs_subset) {
             BswabePrvComp comp = new BswabePrvComp();
             Element h_rtp;
             Element rtp;
 
-            comp.attr = attrs_subset[i];
+            comp.attr = s;
 
             BswabePrvComp comp_src = new BswabePrvComp();
             boolean comp_src_init = false;
 
             for (int j = 0; j < prv_src.comps.size(); ++j) {
-                if (prv_src.comps.get(j).attr == comp.attr) {
+                if (prv_src.comps.get(j).attr.equals(comp.attr)) {
                     comp_src = prv_src.comps.get(j);
                     comp_src_init = true;
                     break;
                 }
             }
 
-            if (comp_src_init == false) {
-                throw new IllegalArgumentException("comp_src_init == false");
-            }
+            if (!comp_src_init) throw new IllegalArgumentException("comp_src_init == false");
 
             comp.d = pairing.getG2().newElement();
             comp.dp = pairing.getG1().newElement();
@@ -229,13 +218,12 @@ public class Bswabe {
             throws Exception {
         BswabeCphKey keyCph = new BswabeCphKey();
         BswabeCph cph = new BswabeCph();
-        Element s, m;
 
         /* initialize */
 
         Pairing pairing = pub.p;
-        s = pairing.getZr().newElement();
-        m = pairing.getGT().newElement();
+        Element s = pairing.getZr().newElement();
+        Element m = pairing.getGT().newElement();
         cph.cs = pairing.getGT().newElement();
         cph.c = pairing.getG1().newElement();
         cph.p = parsePolicyPostfix(policy);
@@ -265,19 +253,15 @@ public class Bswabe {
      * Returns true if decryption succeeded, false if this key does not satisfy
      * the policy of the ciphertext (in which case m is unaltered).
      */
-    public static BswabeElementBoolean dec(BswabePub pub, BswabePrv prv,
-                                           BswabeCph cph) {
-        Element t;
-        Element m;
+    public static BswabeElementBoolean dec(BswabePub pub, BswabePrv prv, BswabeCph cph) {
         BswabeElementBoolean beb = new BswabeElementBoolean();
 
-        m = pub.p.getGT().newElement();
-        t = pub.p.getGT().newElement();
+        Element m = pub.p.getGT().newElement();
+        Element t = pub.p.getGT().newElement();
 
         checkSatisfy(cph.p, prv);
         if (!cph.p.satisfiable) {
-            System.err
-                    .println("cannot decrypt, attributes in key do not satisfy policy");
+            System.err.println("cannot decrypt, attributes in key do not satisfy policy");
             beb.e = null;
             beb.b = false;
             return beb;
@@ -300,33 +284,26 @@ public class Bswabe {
         return beb;
     }
 
-    private static void decFlatten(Element r, BswabePolicy p, BswabePrv prv,
-                                   BswabePub pub) {
-        Element one;
-        one = pub.p.getZr().newElement();
+    private static void decFlatten(Element r, BswabePolicy p, BswabePrv prv, BswabePub pub) {
+        Element one = pub.p.getZr().newElement();
         one.setToOne();
         r.setToOne();
 
         decNodeFlatten(r, one, p, prv, pub);
     }
 
-    private static void decNodeFlatten(Element r, Element exp, BswabePolicy p,
-                                       BswabePrv prv, BswabePub pub) {
+    private static void decNodeFlatten(Element r, Element exp, BswabePolicy p, BswabePrv prv, BswabePub pub) {
         if (p.children == null || p.children.length == 0)
             decLeafFlatten(r, exp, p, prv, pub);
         else
             decInternalFlatten(r, exp, p, prv, pub);
     }
 
-    private static void decLeafFlatten(Element r, Element exp, BswabePolicy p,
-                                       BswabePrv prv, BswabePub pub) {
-        BswabePrvComp c;
-        Element s, t;
+    private static void decLeafFlatten(Element r, Element exp, BswabePolicy p, BswabePrv prv, BswabePub pub) {
+        BswabePrvComp c = prv.comps.get(p.attri);
 
-        c = prv.comps.get(p.attri);
-
-        s = pub.p.getGT().newElement();
-        t = pub.p.getGT().newElement();
+        Element s = pub.p.getGT().newElement();
+        Element t = pub.p.getGT().newElement();
 
         s = pub.p.pairing(p.c, c.d); /* num_pairings++; */
         t = pub.p.pairing(p.cp, c.dp); /* num_pairings++; */
@@ -337,16 +314,12 @@ public class Bswabe {
         r.mul(s); /* num_muls++; */
     }
 
-    private static void decInternalFlatten(Element r, Element exp,
-                                           BswabePolicy p, BswabePrv prv, BswabePub pub) {
-        int i;
-        Element t, expnew;
+    private static void decInternalFlatten(Element r, Element exp, BswabePolicy p, BswabePrv prv, BswabePub pub) {
+        Element t = pub.p.getZr().newElement();
+        Element expnew = pub.p.getZr().newElement();
 
-        t = pub.p.getZr().newElement();
-        expnew = pub.p.getZr().newElement();
-
-        for (i = 0; i < p.satl.size(); i++) {
-            lagrangeCoef(t, p.satl, (p.satl.get(i)).intValue());
+        for (int i = 0; i < p.satl.size(); i++) {
+            lagrangeCoef(t, p.satl, p.satl.get(i));
             expnew = exp.duplicate();
             expnew.mul(t);
             decNodeFlatten(r, expnew, p.children[p.satl.get(i) - 1], prv, pub);
@@ -354,14 +327,11 @@ public class Bswabe {
     }
 
     private static void lagrangeCoef(Element r, ArrayList<Integer> s, int i) {
-        int j, k;
-        Element t;
-
-        t = r.duplicate();
+        // int j, k;
+        Element t = r.duplicate();
 
         r.setToOne();
-        for (k = 0; k < s.size(); k++) {
-            j = s.get(k).intValue();
+        for (int j : s) {
             if (j == i)
                 continue;
             t.set(-j);
@@ -373,47 +343,42 @@ public class Bswabe {
     }
 
     private static void pickSatisfyMinLeaves(BswabePolicy p, BswabePrv prv) {
-        int i, k, l, c_i;
-        int len;
         ArrayList<Integer> c = new ArrayList<Integer>();
 
         if (p.children == null || p.children.length == 0)
             p.min_leaves = 1;
         else {
-            len = p.children.length;
-            for (i = 0; i < len; i++)
+            int len = p.children.length;
+            for (int i = 0; i < len; i++)
                 if (p.children[i].satisfiable)
                     pickSatisfyMinLeaves(p.children[i], prv);
 
-            for (i = 0; i < len; i++)
-                c.add(new Integer(i));
+            for (int i = 0; i < len; i++)
+                c.add(i);
 
-            Collections.sort(c, new IntegerComparator(p));
+            c.sort(new IntegerComparator(p));
 
             p.satl = new ArrayList<Integer>();
             p.min_leaves = 0;
-            l = 0;
+            int l = 0;
 
-            for (i = 0; i < len && l < p.k; i++) {
-                c_i = c.get(i).intValue(); /* c[i] */
+            for (int i = 0; i < len && l < p.k; i++) {
+                int c_i = c.get(i); /* c[i] */
                 if (p.children[c_i].satisfiable) {
                     l++;
                     p.min_leaves += p.children[c_i].min_leaves;
-                    k = c_i + 1;
-                    p.satl.add(new Integer(k));
+                    int k = c_i + 1;
+                    p.satl.add(k);
                 }
             }
         }
     }
 
     private static void checkSatisfy(BswabePolicy p, BswabePrv prv) {
-        int i, l;
-        String prvAttr;
-
         p.satisfiable = false;
         if (p.children == null || p.children.length == 0) {
-            for (i = 0; i < prv.comps.size(); i++) {
-                prvAttr = prv.comps.get(i).attr;
+            for (int i = 0; i < prv.comps.size(); i++) {
+                String prvAttr = prv.comps.get(i).attr;
                 // System.out.println("prvAtt:" + prvAttr);
                 // System.out.println("p.attr" + p.attr);
                 if (prvAttr.compareTo(p.attr) == 0) {
@@ -424,11 +389,11 @@ public class Bswabe {
                 }
             }
         } else {
-            for (i = 0; i < p.children.length; i++)
+            for (int i = 0; i < p.children.length; i++)
                 checkSatisfy(p.children[i], prv);
 
-            l = 0;
-            for (i = 0; i < p.children.length; i++)
+            int l = 0;
+            for (int i = 0; i < p.children.length; i++)
                 if (p.children[i].satisfiable)
                     l++;
 
@@ -439,12 +404,10 @@ public class Bswabe {
 
     private static void fillPolicy(BswabePolicy p, BswabePub pub, Element e)
             throws NoSuchAlgorithmException {
-        int i;
-        Element r, t, h;
         Pairing pairing = pub.p;
-        r = pairing.getZr().newElement();
-        t = pairing.getZr().newElement();
-        h = pairing.getG2().newElement();
+        Element r = pairing.getZr().newElement();
+        Element t = pairing.getZr().newElement();
+        Element h = pairing.getG2().newElement();
 
         p.q = randPoly(p.k - 1, e);
 
@@ -454,12 +417,11 @@ public class Bswabe {
 
             elementFromString(h, p.attr);
             p.c = pub.g.duplicate();
-            ;
             p.c.powZn(p.q.coef[0]);
             p.cp = h.duplicate();
             p.cp.powZn(p.q.coef[0]);
         } else {
-            for (i = 0; i < p.children.length; i++) {
+            for (int i = 0; i < p.children.length; i++) {
                 r.set(i + 1);
                 evalPoly(t, p.q, r);
                 fillPolicy(p.children[i], pub, t);
@@ -469,16 +431,13 @@ public class Bswabe {
     }
 
     private static void evalPoly(Element r, BswabePolynomial q, Element x) {
-        int i;
-        Element s, t;
-
-        s = r.duplicate();
-        t = r.duplicate();
+        Element s = r.duplicate();
+        Element t = r.duplicate();
 
         r.setToZero();
         t.setToOne();
 
-        for (i = 0; i < q.deg + 1; i++) {
+        for (int i = 0; i < q.deg + 1; i++) {
             /* r += q->coef[i] * t */
             s = q.coef[i].duplicate();
             s.mul(t);
@@ -491,35 +450,26 @@ public class Bswabe {
     }
 
     private static BswabePolynomial randPoly(int deg, Element zeroVal) {
-        int i;
         BswabePolynomial q = new BswabePolynomial();
         q.deg = deg;
         q.coef = new Element[deg + 1];
 
-        for (i = 0; i < deg + 1; i++)
+        for (int i = 0; i < deg + 1; i++)
             q.coef[i] = zeroVal.duplicate();
 
         q.coef[0].set(zeroVal);
 
-        for (i = 1; i < deg + 1; i++)
+        for (int i = 1; i < deg + 1; i++)
             q.coef[i].setToRandom();
 
         return q;
     }
 
     private static BswabePolicy parsePolicyPostfix(String s) throws Exception {
-        String[] toks;
-        String tok;
-        ArrayList<BswabePolicy> stack = new ArrayList<BswabePolicy>();
+        ArrayList<BswabePolicy> stack = new ArrayList<>();
         BswabePolicy root;
 
-        toks = s.split(" ");
-
-        int toks_cnt = toks.length;
-        for (int index = 0; index < toks_cnt; index++) {
-            int i, k, n;
-
-            tok = toks[index];
+        for (String tok : s.split("\\s+")) {
             if (!tok.contains("of")) {
                 stack.add(baseNode(1, tok));
             } else {
@@ -527,8 +477,8 @@ public class Bswabe {
 
                 /* parse kof n node */
                 String[] k_n = tok.split("of");
-                k = Integer.parseInt(k_n[0]);
-                n = Integer.parseInt(k_n[1]);
+                int k = Integer.parseInt(k_n[0]);
+                int n = Integer.parseInt(k_n[1]);
 
                 if (k < 1) {
                     System.out.println("error parsing " + s
@@ -552,7 +502,7 @@ public class Bswabe {
                 node = baseNode(k, null);
                 node.children = new BswabePolicy[n];
 
-                for (i = n - 1; i >= 0; i--)
+                for (int i = n - 1; i >= 0; i--)
                     node.children[i] = stack.remove(stack.size() - 1);
 
                 /* push result */
@@ -577,10 +527,7 @@ public class Bswabe {
         BswabePolicy p = new BswabePolicy();
 
         p.k = k;
-        if (!(s == null))
-            p.attr = s;
-        else
-            p.attr = null;
+        p.attr = s;
         p.q = null;
 
         return p;
@@ -594,7 +541,7 @@ public class Bswabe {
     }
 
     private static class IntegerComparator implements Comparator<Integer> {
-        BswabePolicy policy;
+        public final BswabePolicy policy;
 
         public IntegerComparator(BswabePolicy p) {
             this.policy = p;
@@ -602,13 +549,10 @@ public class Bswabe {
 
         @Override
         public int compare(Integer o1, Integer o2) {
-            int k, l;
+            int k = policy.children[o1].min_leaves;
+            int l = policy.children[o2].min_leaves;
 
-            k = policy.children[o1.intValue()].min_leaves;
-            l = policy.children[o2.intValue()].min_leaves;
-
-            return k < l ? -1 :
-                    k == l ? 0 : 1;
+            return Integer.compare(k, l);
         }
     }
 }

@@ -18,8 +18,7 @@ public class AESCoder {
 		return raw;
 	}
 
-	public static byte[] encrypt(byte[] seed, byte[] plaintext)
-			throws Exception {
+	public static byte[] encrypt(byte[] seed, byte[] plaintext) throws Exception {
 		byte[] raw = getRawKey(seed);
 		SecretKeySpec skeySpec = new SecretKeySpec(raw, "AES");
 		Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
