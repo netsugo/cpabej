@@ -17,11 +17,6 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class Bswabe {
-
-    /*
-     * Generate a public key and corresponding master secret key.
-     */
-
     private static final String curveParams = "type a\n"
             + "q 87807107996633125224377819847540498158068831994142082"
             + "1102865339926647563088022295707862517942266222142315585"
@@ -31,42 +26,39 @@ public class Bswabe {
             + "r 730750818665451621361119245571504901405976559617\n"
             + "exp2 159\n" + "exp1 107\n" + "sign1 1\n" + "sign0 1\n";
 
-    public static void setup(BswabePub pub, BswabeMsk msk) {
-        // Element alpha, beta_inv;
-
+    private static Pairing createPairing() {
         CurveParameters params = new DefaultCurveParameters()
                 .load(new ByteArrayInputStream(curveParams.getBytes()));
+        return PairingFactory.getPairing(params);
+    }
 
+    /*
+     * Generate a public key and corresponding master secret key.
+     */
+    public static void setup(BswabePub pub, BswabeMsk msk) {
+        Pairing pairing = createPairing();
+
+        Element g = pairing.getG1().newRandomElement();
+        Element gp = pairing.getG2().newRandomElement();
+        Element alpha = pairing.getZr().newRandomElement();
+        Element beta = pairing.getZr().newRandomElement();
+        Element beta_inv = beta.duplicate().invert();
+
+        Element g_alpha = gp.duplicate().powZn(alpha);
+        Element f = g.duplicate().powZn(beta_inv);
+        Element h = g.duplicate().powZn(beta);
+        Element g_hat_alpha = pairing.pairing(g, g_alpha);
+
+        pub.h = h;
+        pub.f = f;
+        pub.g = g;
+        pub.gp  = gp;
+        pub.p = pairing;
         pub.pairingDesc = curveParams;
-        pub.p = PairingFactory.getPairing(params);
-        Pairing pairing = pub.p;
+        pub.g_hat_alpha = g_hat_alpha;
 
-        pub.g = pairing.getG1().newElement();
-        pub.f = pairing.getG1().newElement();
-        pub.h = pairing.getG1().newElement();
-        pub.gp = pairing.getG2().newElement();
-        pub.g_hat_alpha = pairing.getGT().newElement();
-        Element alpha = pairing.getZr().newElement();
-        msk.beta = pairing.getZr().newElement();
-        msk.g_alpha = pairing.getG2().newElement();
-
-        alpha.setToRandom();
-        msk.beta.setToRandom();
-        pub.g.setToRandom();
-        pub.gp.setToRandom();
-
-        msk.g_alpha = pub.gp.duplicate();
-        msk.g_alpha.powZn(alpha);
-
-        Element beta_inv = msk.beta.duplicate();
-        beta_inv.invert();
-        pub.f = pub.g.duplicate();
-        pub.f.powZn(beta_inv);
-
-        pub.h = pub.g.duplicate();
-        pub.h.powZn(msk.beta);
-
-        pub.g_hat_alpha = pairing.pairing(pub.g, msk.g_alpha);
+        msk.beta = beta;
+        msk.g_alpha = g_alpha;
     }
 
     /*
