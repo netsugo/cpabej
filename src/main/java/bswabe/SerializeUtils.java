@@ -23,12 +23,12 @@ public class SerializeUtils {
         return ByteBuffer.wrap(lenInfo).getInt();
     }
 
-    private static void writeBytes(OutputStream stream, byte[] data) throws IOException {
+    public static void writeBytes(OutputStream stream, byte[] data) throws IOException {
         writeInt(stream, data.length);
         stream.write(data);
     }
 
-    private static byte[] readBytes(InputStream stream) throws IOException {
+    public static byte[] readBytes(InputStream stream) throws IOException {
         int len = readInt(stream);
         byte[] data = new byte[len];
         stream.read(data);
