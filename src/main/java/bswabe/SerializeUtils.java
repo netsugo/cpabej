@@ -2,281 +2,259 @@ package bswabe;
 
 import it.unisa.dia.gas.jpbc.CurveParameters;
 import it.unisa.dia.gas.jpbc.Element;
+import it.unisa.dia.gas.jpbc.Field;
 import it.unisa.dia.gas.jpbc.Pairing;
 import it.unisa.dia.gas.plaf.jpbc.pairing.DefaultCurveParameters;
 import it.unisa.dia.gas.plaf.jpbc.pairing.PairingFactory;
 
-import java.io.ByteArrayInputStream;
+import java.io.*;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 
 public class SerializeUtils {
-
-    /* Method has been test okay */
-    public static void serializeElement(ArrayList<Byte> list, Element e) {
-        byte[] arr_e = e.toBytes();
-        serializeUint32(list, arr_e.length);
-        byteArrListAppend(list, arr_e);
+    private static void writeInt(OutputStream stream, int i) throws IOException {
+        byte[] data = ByteBuffer.allocate(4).putInt(i).array();
+        stream.write(data);
     }
 
-    /* Method has been test okay */
-    public static int unserializeElement(byte[] arr, int offset, Element e) {
-        int len = unserializeUint32(arr, offset);
-        byte[] e_byte = new byte[(int) len];
-        offset += 4;
-        System.arraycopy(arr, offset, e_byte, 0, len);
-        e.setFromBytes(e_byte);
-
-        return offset + len;
+    private static int readInt(InputStream stream) throws IOException {
+        byte[] lenInfo = new byte[4];
+        stream.read(lenInfo);
+        return ByteBuffer.wrap(lenInfo).getInt();
     }
 
-    public static void serializeString(ArrayList<Byte> list, String s) {
-        byte[] b = s.getBytes();
-        serializeUint32(list, b.length);
-        byteArrListAppend(list, b);
+    private static void writeBytes(OutputStream stream, byte[] data) throws IOException {
+        writeInt(stream, data.length);
+        stream.write(data);
     }
 
-    /*
-     * Usage:
-     *
-     * StringBuffer sb = new StringBuffer("");
-     *
-     * offset = unserializeString(arr, offset, sb);
-     *
-     * String str = sb.substring(0);
-     */
-    public static int unserializeString(byte[] arr, int offset, StringBuffer sb) {
-        int len = unserializeUint32(arr, offset);
-        offset += 4;
-        byte[] str_byte = new byte[len];
-        System.arraycopy(arr, offset, str_byte, 0, len);
+    private static byte[] readBytes(InputStream stream) throws IOException {
+        int len = readInt(stream);
+        byte[] data = new byte[len];
+        stream.read(data);
 
-        sb.append(new String(str_byte));
-        return offset + len;
+        return data;
+    }
+
+    private static void serializeElement(OutputStream stream, Element e) throws IOException {
+        writeBytes(stream, e.toBytes());
+    }
+
+    private static Element unserializeElement(InputStream stream, Field field) throws IOException {
+        byte[] data = readBytes(stream);
+        Element e = field.newElement();
+        e.setFromBytes(data);
+        return e;
+    }
+
+    private static void serializeString(OutputStream stream, String s) throws IOException {
+        byte[] data = s.getBytes();
+        writeBytes(stream, data);
+    }
+
+    private static String unserializeString(InputStream stream) throws IOException {
+        byte[] data = readBytes(stream);
+        return new String(data);
     }
 
     public static byte[] serializeBswabePub(BswabePub pub) {
-        ArrayList<Byte> list = new ArrayList<>();
+        ByteArrayOutputStream stream = new ByteArrayOutputStream();
 
-        serializeString(list, pub.pairingDesc);
-        serializeElement(list, pub.g);
-        serializeElement(list, pub.h);
-        serializeElement(list, pub.gp);
-        serializeElement(list, pub.g_hat_alpha);
+        try {
+            serializeString(stream, pub.pairingDesc);
+            serializeElement(stream, pub.g);
+            serializeElement(stream, pub.h);
+            serializeElement(stream, pub.gp);
+            serializeElement(stream, pub.g_hat_alpha);
 
-        return Byte_arr2byte_arr(list);
+            return stream.toByteArray();
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     public static BswabePub unserializeBswabePub(byte[] b) {
-        BswabePub pub = new BswabePub();
-        int offset = 0;
+        ByteArrayInputStream stream = new ByteArrayInputStream(b);
 
-        StringBuffer sb = new StringBuffer("");
-        offset = unserializeString(b, offset, sb);
-        pub.pairingDesc = sb.substring(0);
+        try {
+            String paringDesc = unserializeString(stream);
 
-        CurveParameters params = new DefaultCurveParameters()
-                .load(new ByteArrayInputStream(pub.pairingDesc.getBytes()));
-        pub.p = PairingFactory.getPairing(params);
-        Pairing pairing = pub.p;
+            CurveParameters params = new DefaultCurveParameters()
+                    .load(new ByteArrayInputStream(paringDesc.getBytes()));
+            Pairing pairing = PairingFactory.getPairing(params);
 
-        pub.g = pairing.getG1().newElement();
-        pub.h = pairing.getG1().newElement();
-        pub.gp = pairing.getG2().newElement();
-        pub.g_hat_alpha = pairing.getGT().newElement();
+            Element g = unserializeElement(stream, pairing.getG1());
+            Element h = unserializeElement(stream, pairing.getG1());
+            Element gp = unserializeElement(stream, pairing.getG2());
+            Element g_hat_alpha = unserializeElement(stream, pairing.getGT());
 
-        offset = unserializeElement(b, offset, pub.g);
-        offset = unserializeElement(b, offset, pub.h);
-        offset = unserializeElement(b, offset, pub.gp);
-        offset = unserializeElement(b, offset, pub.g_hat_alpha);
+            BswabePub pub = new BswabePub();
+            pub.pairingDesc = paringDesc;
+            pub.p = pairing;
+            pub.g = g;
+            pub.h = h;
+            pub.gp = gp;
+            pub.g_hat_alpha = g_hat_alpha;
 
-        return pub;
+            return pub;
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     /* Method has been test okay */
     public static byte[] serializeBswabeMsk(BswabeMsk msk) {
-        ArrayList<Byte> list = new ArrayList<>();
+        ByteArrayOutputStream stream = new ByteArrayOutputStream();
 
-        serializeElement(list, msk.beta);
-        serializeElement(list, msk.g_alpha);
+        try {
+            serializeElement(stream, msk.beta);
+            serializeElement(stream, msk.g_alpha);
 
-        return Byte_arr2byte_arr(list);
+            return stream.toByteArray();
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     /* Method has been test okay */
     public static BswabeMsk unserializeBswabeMsk(BswabePub pub, byte[] b) {
-        int offset = 0;
-        BswabeMsk msk = new BswabeMsk();
+        ByteArrayInputStream stream = new ByteArrayInputStream(b);
 
-        msk.beta = pub.p.getZr().newElement();
-        msk.g_alpha = pub.p.getG2().newElement();
+        try {
+            Pairing pairing = pub.p;
+            Element beta = unserializeElement(stream, pairing.getZr());
+            Element g_alpha = unserializeElement(stream, pub.p.getG2());
 
-        offset = unserializeElement(b, offset, msk.beta);
-        offset = unserializeElement(b, offset, msk.g_alpha);
-
-        return msk;
+            BswabeMsk msk = new BswabeMsk();
+            msk.beta = beta;
+            msk.g_alpha = g_alpha;
+            return msk;
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     /* Method has been test okay */
     public static byte[] serializeBswabePrv(BswabePrv prv) {
-        ArrayList<Byte> list = new ArrayList<>();
-        int prvCompsLen = prv.comps.size();
-        serializeElement(list, prv.d);
-        serializeUint32(list, prvCompsLen);
+        ByteArrayOutputStream stream = new ByteArrayOutputStream();
 
-        for (int i = 0; i < prvCompsLen; i++) {
-            serializeString(list, prv.comps.get(i).attr);
-            serializeElement(list, prv.comps.get(i).d);
-            serializeElement(list, prv.comps.get(i).dp);
+        try {
+            serializeElement(stream, prv.d);
+            writeInt(stream, prv.comps.size());
+
+            for (BswabePrvComp comp : prv.comps) {
+                serializeString(stream, comp.attr);
+                serializeElement(stream, comp.d);
+                serializeElement(stream, comp.dp);
+            }
+
+            return stream.toByteArray();
+        } catch (IOException e) {
+            return null;
         }
-
-        return Byte_arr2byte_arr(list);
     }
 
     /* Method has been test okay */
     public static BswabePrv unserializeBswabePrv(BswabePub pub, byte[] b) {
-        BswabePrv prv = new BswabePrv();
-        int offset = 0;
+        ByteArrayInputStream stream = new ByteArrayInputStream(b);
 
-        prv.d = pub.p.getG2().newElement();
-        offset = unserializeElement(b, offset, prv.d);
+        try {
+            Pairing pairing = pub.p;
+            Element prv_d = unserializeElement(stream, pairing.getG2());
+            int len = readInt(stream);
+            ArrayList<BswabePrvComp> components = new ArrayList<>();
 
-        prv.comps = new ArrayList<>();
-        int len = unserializeUint32(b, offset);
-        offset += 4;
+            for (int i = 0; i < len; i++) {
+                String attr = unserializeString(stream);
+                Element d = unserializeElement(stream, pairing.getG2());
+                Element dp = unserializeElement(stream, pairing.getG2());
 
-        for (int i = 0; i < len; i++) {
-            BswabePrvComp c = new BswabePrvComp();
+                BswabePrvComp c = new BswabePrvComp();
+                c.attr = attr;
+                c.d = d;
+                c.dp = dp;
+                components.add(c);
+            }
 
-            StringBuffer sb = new StringBuffer("");
-            offset = unserializeString(b, offset, sb);
-            c.attr = sb.substring(0);
-
-            c.d = pub.p.getG2().newElement();
-            c.dp = pub.p.getG2().newElement();
-
-            offset = unserializeElement(b, offset, c.d);
-            offset = unserializeElement(b, offset, c.dp);
-
-            prv.comps.add(c);
-        }
-
-        return prv;
-    }
-
-    public static byte[] bswabeCphSerialize(BswabeCph cph) {
-        ArrayList<Byte> list = new ArrayList<>();
-        SerializeUtils.serializeElement(list, cph.cs);
-        SerializeUtils.serializeElement(list, cph.c);
-        SerializeUtils.serializePolicy(list, cph.p);
-
-        return Byte_arr2byte_arr(list);
-    }
-
-    public static BswabeCph bswabeCphUnserialize(BswabePub pub, byte[] cphBuf) {
-        BswabeCph cph = new BswabeCph();
-        int offset = 0;
-        int[] offset_arr = new int[1];
-
-        cph.cs = pub.p.getGT().newElement();
-        cph.c = pub.p.getG1().newElement();
-
-        offset = SerializeUtils.unserializeElement(cphBuf, offset, cph.cs);
-        offset = SerializeUtils.unserializeElement(cphBuf, offset, cph.c);
-
-        offset_arr[0] = offset;
-        cph.p = SerializeUtils.unserializePolicy(pub, cphBuf, offset_arr);
-        offset = offset_arr[0];
-
-        return cph;
-    }
-
-    /* Method has been test okay */
-    /* potential problem: the number to be serialize is less than 2^31 */
-    private static void serializeUint32(ArrayList<Byte> list, int k) {
-        for (int i = 3; i >= 0; i--) {
-            byte b = (byte) ((k & (0x000000ff << (i * 8))) >> (i * 8));
-            list.add(b);
+            BswabePrv prv = new BswabePrv();
+            prv.d = prv_d;
+            prv.comps = components;
+            return prv;
+        } catch (IOException e) {
+            return null;
         }
     }
 
-    /*
-     * Usage:
-     *
-     * You have to do offset+=4 after call this method
-     */
-    /* Method has been test okay */
-    private static int unserializeUint32(byte[] arr, int offset) {
-        int r = 0;
 
-        for (int i = 3; i >= 0; i--)
-            r |= (byte2int(arr[offset++])) << (i * 8);
-        return r;
-    }
+    private static void serializePolicy(OutputStream stream, BswabePolicy policy) throws IOException {
+        writeInt(stream, policy.k);
 
-    private static void serializePolicy(ArrayList<Byte> list, BswabePolicy p) {
-        serializeUint32(list, p.k);
-
-        if (p.children == null || p.children.length == 0) {
-            serializeUint32(list, 0);
-            serializeString(list, p.attr);
-            serializeElement(list, p.c);
-            serializeElement(list, p.cp);
+        BswabePolicy[] policies = policy.children;
+        if (policies == null || policies.length == 0) {
+            writeInt(stream, 0);
+            serializeString(stream, policy.attr);
+            serializeElement(stream, policy.c);
+            serializeElement(stream, policy.cp);
         } else {
-            serializeUint32(list, p.children.length);
-            for (int i = 0; i < p.children.length; i++)
-                serializePolicy(list, p.children[i]);
+            writeInt(stream, policies.length);
+            for (BswabePolicy p : policies) {
+                serializePolicy(stream, p);
+            }
         }
     }
 
-    private static BswabePolicy unserializePolicy(BswabePub pub, byte[] arr,
-                                                  int[] offset) {
+    private static BswabePolicy unserializePolicy(InputStream stream, BswabePub pub) throws IOException {
         BswabePolicy p = new BswabePolicy();
-        p.k = unserializeUint32(arr, offset[0]);
-        offset[0] += 4;
-        p.attr = null;
+        p.k = readInt(stream);
 
         /* children */
-        int n = unserializeUint32(arr, offset[0]);
-        offset[0] += 4;
-        if (n == 0) {
-            p.children = null;
-
-            StringBuffer sb = new StringBuffer("");
-            offset[0] = unserializeString(arr, offset[0], sb);
-            p.attr = sb.substring(0);
-
-            p.c = pub.p.getG1().newElement();
-            p.cp = pub.p.getG1().newElement();
-
-            offset[0] = unserializeElement(arr, offset[0], p.c);
-            offset[0] = unserializeElement(arr, offset[0], p.cp);
+        int n = readInt(stream);
+        if (n > 0) {
+            BswabePolicy[] array = new BswabePolicy[n];
+            for (int i = 0; i < n; i++) {
+                array[i] = unserializePolicy(stream, pub);
+            }
+            p.children = array;
         } else {
-            p.children = new BswabePolicy[n];
-            for (int i = 0; i < n; i++)
-                p.children[i] = unserializePolicy(pub, arr, offset);
+            Pairing paring = pub.p;
+            p.children = null;
+            p.attr = unserializeString(stream);
+            p.c = unserializeElement(stream, paring.getG1());
+            p.cp = unserializeElement(stream, paring.getG1());
         }
 
         return p;
     }
 
-    private static int byte2int(byte b) {
-        if (b >= 0)
-            return b;
-        return (256 + b);
+    public static byte[] serializeBswabeCph(BswabeCph cph) {
+        ByteArrayOutputStream stream = new ByteArrayOutputStream();
+
+        try {
+            serializeElement(stream, cph.cs);
+            serializeElement(stream, cph.c);
+            serializePolicy(stream, cph.p);
+            return stream.toByteArray();
+        } catch (IOException e) {
+            return null;
+        }
     }
 
-    private static void byteArrListAppend(ArrayList<Byte> list, byte[] b) {
-        for (byte value : b) list.add(value);
+    public static BswabeCph unserializeBswabeCph(BswabePub pub, byte[] cphBuf) {
+        ByteArrayInputStream stream = new ByteArrayInputStream(cphBuf);
+
+        try {
+            Pairing pairing = pub.p;
+            Element cs = unserializeElement(stream, pairing.getGT());
+            Element c = unserializeElement(stream, pairing.getG1());
+            BswabePolicy policy = unserializePolicy(stream, pub);
+
+            BswabeCph cph = new BswabeCph();
+            cph.cs = cs;
+            cph.c = c;
+            cph.p = policy;
+            return cph;
+        } catch (IOException e) {
+            return null;
+        }
     }
-
-    private static byte[] Byte_arr2byte_arr(ArrayList<Byte> B) {
-        int len = B.size();
-        byte[] b = new byte[len];
-
-        for (int i = 0; i < len; i++)
-            b[i] = B.get(i);
-
-        return b;
-    }
-
 }

@@ -54,7 +54,7 @@ public class Cpabe {
             BswabeCph cph = keyCph.cph;
             Element element = keyCph.key;
 
-            byte[] cphBuf = SerializeUtils.bswabeCphSerialize(cph);
+            byte[] cphBuf = SerializeUtils.serializeBswabeCph(cph);
             byte[] aesBuf = AESCoder.encrypt(element.toBytes(), plain);
 
             return packCpabe(cphBuf, aesBuf);
@@ -78,7 +78,7 @@ public class Cpabe {
             byte[] aesBuf = tmp[BUF_AES];
             byte[] cphBuf = tmp[BUF_CPH];
             BswabePub pub = SerializeUtils.unserializeBswabePub(publicKey);
-            BswabeCph cph = SerializeUtils.bswabeCphUnserialize(pub, cphBuf);
+            BswabeCph cph = SerializeUtils.unserializeBswabeCph(pub, cphBuf);
             BswabePrv prv = SerializeUtils.unserializeBswabePrv(pub, privateKey);
 
             Element e = Bswabe.decrypt(pub, prv, cph);

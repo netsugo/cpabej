@@ -214,9 +214,6 @@ public class Bswabe {
      * the provided element m (which need not be initialized) with the result.
      */
     public static Element decrypt(BswabePub pub, BswabePrv prv, BswabeCph cph) {
-        Element m = pub.p.getGT().newElement();
-        Element t = pub.p.getGT().newElement();
-
         checkSatisfy(cph.p, prv);
         if (!cph.p.satisfiable) {
             throw new RuntimeException("Attributes in key do not satisfy policy");
@@ -224,21 +221,17 @@ public class Bswabe {
 
         pickSatisfyMinLeaves(cph.p);
 
-        decFlatten(t, cph.p, prv, pub);
+        Element r = pub.p.getGT().newElement();
+        decFlatten(r, cph.p, prv, pub);
 
-        m = cph.cs.duplicate();
-        m.mul(t); /* num_muls++; */
-
-        t = pub.p.pairing(cph.c, prv.d);
-        t.invert();
-        m.mul(t); /* num_muls++; */
+        Element t = pub.p.pairing(cph.c, prv.d).invert();
+        Element m = cph.cs.duplicate().mul(r).mul(t);
 
         return m;
     }
 
     private static void decFlatten(Element r, BswabePolicy p, BswabePrv prv, BswabePub pub) {
-        Element one = pub.p.getZr().newElement();
-        one.setToOne();
+        Element one = pub.p.getZr().newElement().setToOne();
         r.setToOne();
 
         decNodeFlatten(r, one, p, prv, pub);
@@ -254,33 +247,24 @@ public class Bswabe {
     private static void decLeafFlatten(Element r, Element exp, BswabePolicy p, BswabePrv prv, BswabePub pub) {
         BswabePrvComp c = prv.comps.get(p.attri);
 
-        Element s = pub.p.getGT().newElement();
-        Element t = pub.p.getGT().newElement();
+        Element t = pub.p.pairing(p.cp, c.dp).invert();
+        Element s = pub.p.pairing(p.c, c.d).mul(t).powZn(exp);
 
-        s = pub.p.pairing(p.c, c.d); /* num_pairings++; */
-        t = pub.p.pairing(p.cp, c.dp); /* num_pairings++; */
-        t.invert();
-        s.mul(t); /* num_muls++; */
-        s.powZn(exp); /* num_exps++; */
-
-        r.mul(s); /* num_muls++; */
+        r.mul(s);
     }
 
     private static void decInternalFlatten(Element r, Element exp, BswabePolicy p, BswabePrv prv, BswabePub pub) {
         Element t = pub.p.getZr().newElement();
-        Element expnew = pub.p.getZr().newElement();
         ArrayList<Integer> satl = p.satl;
 
         for (Integer sat : satl) {
             lagrangeCoef(t, satl, sat);
-            expnew = exp.duplicate();
-            expnew.mul(t);
+            Element expnew = exp.duplicate().mul(t);
             decNodeFlatten(r, expnew, p.children[sat - 1], prv, pub);
         }
     }
 
     private static void lagrangeCoef(Element r, ArrayList<Integer> s, int i) {
-        // int j, k;
         Element t = r.duplicate();
 
         r.setToOne();
@@ -323,16 +307,25 @@ public class Bswabe {
         }
     }
 
+    private static int searchAttri(String attr, BswabePrv prv) {
+        int i = 0;
+        for (BswabePrvComp comp : prv.comps) {
+            if (comp.attr.compareTo(attr) == 0) {
+                return i;
+            } else {
+                i++;
+            }
+        }
+        return -1;
+    }
+
     private static void checkSatisfy(BswabePolicy p, BswabePrv prv) {
         p.satisfiable = false;
         if (p.children == null || p.children.length == 0) {
-            for (int i = 0; i < prv.comps.size(); i++) {
-                String prvAttr = prv.comps.get(i).attr;
-                if (prvAttr.compareTo(p.attr) == 0) {
-                    p.satisfiable = true;
-                    p.attri = i;
-                    break;
-                }
+            int attri = searchAttri(p.attr, prv);
+            if (attri >= 0) {
+                p.satisfiable = true;
+                p.attri = attri;
             }
         } else {
             Arrays.stream(p.children)
@@ -347,65 +340,46 @@ public class Bswabe {
         }
     }
 
-    private static void fillPolicy(BswabePolicy p, BswabePub pub, Element e)
-            throws NoSuchAlgorithmException {
+    private static void fillPolicy(BswabePolicy p, BswabePub pub, Element e) throws NoSuchAlgorithmException {
         Pairing pairing = pub.p;
-        Element r = pairing.getZr().newElement();
-        Element t = pairing.getZr().newElement();
-        Element h = pairing.getG2().newElement();
-
         p.q = randPoly(p.k - 1, e);
 
         if (p.children == null || p.children.length == 0) {
-            p.c = pairing.getG1().newElement();
-            p.cp = pairing.getG2().newElement();
-
-            elementFromString(h, p.attr);
-            p.c = pub.g.duplicate();
-            p.c.powZn(p.q.coef[0]);
-            p.cp = h.duplicate();
-            p.cp.powZn(p.q.coef[0]);
+            Element h = pairing.getG2().newElement();
+            p.c = pub.g.duplicate().powZn(p.q.coef[0]);
+            p.cp = elementFromString(h, p.attr).powZn(p.q.coef[0]);
         } else {
-            for (int i = 0; i < p.children.length; i++) {
+            Element r = pairing.getZr().newElement();
+            Element t = pairing.getZr().newElement();
+            int i = 0;
+            for (BswabePolicy policy : p.children) {
                 r.set(i + 1);
                 evalPoly(t, p.q, r);
-                fillPolicy(p.children[i], pub, t);
+                fillPolicy(policy, pub, t);
+                i++;
             }
         }
 
     }
 
     private static void evalPoly(Element r, BswabePolynomial q, Element x) {
-        Element s = r.duplicate();
-        Element t = r.duplicate();
-
+        Element t = r.duplicate().setToOne();
         r.setToZero();
-        t.setToOne();
 
-        for (int i = 0; i < q.deg + 1; i++) {
-            /* r += q->coef[i] * t */
-            s = q.coef[i].duplicate();
-            s.mul(t);
-            r.add(s);
-
-            /* t *= x */
-            t.mul(x);
-        }
-
+        /* r += q->coef[i] * t */
+        Arrays.stream(q.coef)
+                .map(s -> s.duplicate().mul(t))
+                .forEach(r::add);
     }
 
     private static BswabePolynomial randPoly(int deg, Element zeroVal) {
+        Element[] coef = new Element[deg + 1];
+        Arrays.setAll(coef, i -> zeroVal.duplicate().setToRandom());
+        coef[0].set(zeroVal);
+
         BswabePolynomial q = new BswabePolynomial();
         q.deg = deg;
-        q.coef = new Element[deg + 1];
-
-        for (int i = 0; i < deg + 1; i++)
-            q.coef[i] = zeroVal.duplicate();
-
-        q.coef[0].set(zeroVal);
-
-        for (int i = 1; i < deg + 1; i++)
-            q.coef[i].setToRandom();
+        q.coef = coef;
 
         return q;
     }
@@ -436,10 +410,9 @@ public class Bswabe {
 
                 /* pop n things and fill in children */
                 BswabePolicy node = baseNode(k, null);
-                node.children = new BswabePolicy[n];
-
-                for (int i = n - 1; i >= 0; i--)
-                    node.children[i] = stack.remove(stack.size() - 1);
+                List<BswabePolicy> headList = stack.subList(0, n);
+                node.children = headList.toArray(new BswabePolicy[n]);
+                stack.removeAll(headList);
 
                 /* push result */
                 stack.add(node);
@@ -465,10 +438,10 @@ public class Bswabe {
         return p;
     }
 
-    private static void elementFromString(Element h, String s) throws NoSuchAlgorithmException {
+    private static Element elementFromString(Element h, String s) throws NoSuchAlgorithmException {
         MessageDigest md = MessageDigest.getInstance("SHA-1");
         byte[] digest = md.digest(s.getBytes());
-        h.setFromHash(digest, 0, digest.length);
+        return h.setFromHash(digest, 0, digest.length);
     }
 
     private static class IntegerComparator implements Comparator<Integer> {
