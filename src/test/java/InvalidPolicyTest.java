@@ -41,7 +41,7 @@ public class InvalidPolicyTest {
     }
 
     @Test
-    public void fewPolicy() {
+    public void tooFew() {
         Cpabe cpabe = new Cpabe();
         byte[][] byteArrays = cpabe.setup();
         byte[] pubkey = byteArrays[Cpabe.SETUP_PUBLIC];
@@ -53,7 +53,7 @@ public class InvalidPolicyTest {
     }
 
     @Test
-    public void manyPolicy() {
+    public void tooMany() {
         Cpabe cpabe = new Cpabe();
         byte[][] byteArrays = cpabe.setup();
         byte[] pubkey = byteArrays[Cpabe.SETUP_PUBLIC];
@@ -65,7 +65,7 @@ public class InvalidPolicyTest {
     }
 
     @Test
-    public void invalidSinglePolicy() {
+    public void invalidSingle() {
         Cpabe cpabe = new Cpabe();
         byte[][] byteArrays = cpabe.setup();
         byte[] pubkey = byteArrays[Cpabe.SETUP_PUBLIC];
@@ -77,7 +77,7 @@ public class InvalidPolicyTest {
     }
 
     @Test
-    public void unsatisfiableOpPolicy() {
+    public void unsatisfiableOp() {
         Cpabe cpabe = new Cpabe();
         byte[][] byteArrays = cpabe.setup();
         byte[] pubkey = byteArrays[Cpabe.SETUP_PUBLIC];
@@ -89,7 +89,7 @@ public class InvalidPolicyTest {
     }
 
     @Test
-    public void triviallySatisfiedOpPolicy() {
+    public void triviallySatisfiedOp() {
         Cpabe cpabe = new Cpabe();
         byte[][] byteArrays = cpabe.setup();
         byte[] pubkey = byteArrays[Cpabe.SETUP_PUBLIC];

@@ -22,11 +22,11 @@ public class IntegrationTest {
         byte[] encrypted = cpabe.encrypt(pubkey, policy, plain);
 
         Assertions.assertArrayEquals(plain, cpabe.decrypt(pubkey, secretAlice, encrypted));
-        Assertions.assertThrows(Exception.class, () -> cpabe.decrypt(pubkey, secretBob, encrypted));
+        Assertions.assertThrows(DecryptException.class, () -> cpabe.decrypt(pubkey, secretBob, encrypted));
     }
 
     @Test
-    public void multiOrPolicy() throws Exception {
+    public void multipleOrPolicy() throws Exception {
         Cpabe cpabe = new Cpabe();
         byte[][] byteArrays = cpabe.setup();
         byte[] pubkey = byteArrays[Cpabe.SETUP_PUBLIC];
