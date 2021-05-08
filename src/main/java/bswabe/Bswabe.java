@@ -188,30 +188,21 @@ public class Bswabe {
      * retrieved by calling bswabe_error().
      */
     public static BswabeCphKey encrypt(BswabePub pub, String policy) throws ParseException, NoSuchAlgorithmException {
-        BswabeCphKey keyCph = new BswabeCphKey();
-        BswabeCph cph = new BswabeCph();
-
-        /* initialize */
-
         Pairing pairing = pub.p;
-        Element s = pairing.getZr().newElement();
-        Element m = pairing.getGT().newElement();
-        cph.cs = pairing.getGT().newElement();
-        cph.c = pairing.getG1().newElement();
-        cph.p = parsePolicyPostfix(policy);
+        Element s = pairing.getZr().newRandomElement();
+        Element m = pairing.getGT().newRandomElement();
+        Element cs = pub.g_hat_alpha.duplicate().powZn(s).mul(m);
+        Element c = pub.h.duplicate().powZn(s);
+        BswabePolicy parsedPolicy = parsePolicyPostfix(policy);
 
-        /* compute */
-        m.setToRandom();
-        s.setToRandom();
-        cph.cs = pub.g_hat_alpha.duplicate();
-        cph.cs.powZn(s); /* num_exps++; */
-        cph.cs.mul(m); /* num_muls++; */
+        fillPolicy(parsedPolicy, pub, s);
 
-        cph.c = pub.h.duplicate();
-        cph.c.powZn(s); /* num_exps++; */
+        BswabeCph cph = new BswabeCph();
+        cph.c = c;
+        cph.cs = cs;
+        cph.p = parsedPolicy;
 
-        fillPolicy(cph.p, pub, s);
-
+        BswabeCphKey keyCph = new BswabeCphKey();
         keyCph.cph = cph;
         keyCph.key = m;
 
