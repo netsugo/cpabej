@@ -52,7 +52,7 @@ public class Bswabe {
         pub.h = h;
         pub.f = f;
         pub.g = g;
-        pub.gp  = gp;
+        pub.gp = gp;
         pub.p = pairing;
         pub.pairingDesc = curveParams;
         pub.g_hat_alpha = g_hat_alpha;
@@ -64,51 +64,35 @@ public class Bswabe {
     /*
      * Generate a private key with the given set of attributes.
      */
-    public static BswabePrv keygen(BswabePub pub, BswabeMsk msk, String[] attrs)
-            throws NoSuchAlgorithmException {
-        BswabePrv prv = new BswabePrv();
-
-        /* initialize */
+    public static BswabePrv keygen(BswabePub pub, BswabeMsk msk, String[] attrs) throws NoSuchAlgorithmException {
         Pairing pairing = pub.p;
-        prv.d = pairing.getG2().newElement();
-        Element g_r = pairing.getG2().newElement();
-        Element r = pairing.getZr().newElement();
-        Element beta_inv = pairing.getZr().newElement();
 
-        /* compute */
-        r.setToRandom();
-        g_r = pub.gp.duplicate();
-        g_r.powZn(r);
+        Element r = pairing.getZr().newRandomElement();
+        Element g_r = pub.g.duplicate().powZn(r);
+        Element beta_inv = msk.beta.duplicate().invert();
+        Element prv_d = msk.g_alpha.duplicate().mul(g_r).powZn(beta_inv);
 
-        prv.d = msk.g_alpha.duplicate();
-        prv.d.mul(g_r);
-        beta_inv = msk.beta.duplicate();
-        beta_inv.invert();
-        prv.d.powZn(beta_inv);
-
-        prv.comps = new ArrayList<>();
+        ArrayList<BswabePrvComp> components = new ArrayList<>();
         for (String attr : attrs) {
-            BswabePrvComp comp = new BswabePrvComp();
-            comp.attr = attr;
-
-            comp.d = pairing.getG2().newElement();
-            comp.dp = pairing.getG1().newElement();
             Element h_rp = pairing.getG2().newElement();
-            Element rp = pairing.getZr().newElement();
-
-            elementFromString(h_rp, comp.attr);
-            rp.setToRandom();
-
+            elementFromString(h_rp, attr);
+            Element rp = pairing.getZr().newRandomElement();
             h_rp.powZn(rp);
+            Element d = g_r.duplicate().mul(h_rp);
+            Element dp = pub.g.duplicate().powZn(rp);
 
-            comp.d = g_r.duplicate();
-            comp.d.mul(h_rp);
-            comp.dp = pub.g.duplicate();
-            comp.dp.powZn(rp);
+            BswabePrvComp comp = new BswabePrvComp();
 
-            prv.comps.add(comp);
+            comp.attr = attr;
+            comp.d = d;
+            comp.dp = dp;
+
+            components.add(comp);
         }
 
+        BswabePrv prv = new BswabePrv();
+        prv.comps = components;
+        prv.d = prv_d;
         return prv;
     }
 
