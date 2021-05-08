@@ -87,4 +87,12 @@ public class Cpabe {
             throw new DecryptException(e.getMessage(), e.getCause());
         }
     }
+
+    public byte[] delegate(byte[] pubKey, byte[] oldSecret, String subAttributes) throws NoSuchAlgorithmException {
+        BswabePub pub = SerializeUtils.unserializeBswabePub(pubKey);
+        BswabePrv oldKey = SerializeUtils.unserializeBswabePrv(pub, oldSecret);
+        String[] parsedAttribute = LangPolicy.parseAttribute(subAttributes);
+        BswabePrv newKey = Bswabe.delegate(pub, oldKey, parsedAttribute);
+        return SerializeUtils.serializeBswabePrv(newKey);
+    }
 }
