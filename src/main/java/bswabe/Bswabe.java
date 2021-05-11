@@ -221,20 +221,18 @@ public class Bswabe {
 
         pickSatisfyMinLeaves(cph.p);
 
-        Element r = pub.p.getGT().newElement();
-        decFlatten(r, cph.p, prv, pub);
-
+        Element r = decFlatten(cph.p, prv, pub);
         Element t = pub.p.pairing(cph.c, prv.d).invert();
         Element m = cph.cs.duplicate().mul(r).mul(t);
 
         return m;
     }
 
-    private static void decFlatten(Element r, BswabePolicy p, BswabePrv prv, BswabePub pub) {
+    private static Element decFlatten(BswabePolicy p, BswabePrv prv, BswabePub pub) {
+        Element r = pub.p.getGT().newElement().setToOne();
         Element one = pub.p.getZr().newElement().setToOne();
-        r.setToOne();
-
         decNodeFlatten(r, one, p, prv, pub);
+        return r;
     }
 
     private static void decNodeFlatten(Element r, Element exp, BswabePolicy p, BswabePrv prv, BswabePub pub) {
@@ -320,12 +318,14 @@ public class Bswabe {
     }
 
     private static void checkSatisfy(BswabePolicy p, BswabePrv prv) {
-        p.satisfiable = false;
         if (p.children == null || p.children.length == 0) {
             int attri = searchAttri(p.attr, prv);
             if (attri >= 0) {
                 p.satisfiable = true;
                 p.attri = attri;
+            } else {
+                p.satisfiable = false;
+                p.attri = 0;
             }
         } else {
             Arrays.stream(p.children)
@@ -335,8 +335,7 @@ public class Bswabe {
                     .filter(policy -> policy.satisfiable)
                     .count();
 
-            if (l >= p.k)
-                p.satisfiable = true;
+            p.satisfiable = l >= p.k;
         }
     }
 
@@ -346,15 +345,14 @@ public class Bswabe {
 
         if (p.children == null || p.children.length == 0) {
             Element h = pairing.getG2().newElement();
-            p.c = pub.g.duplicate().powZn(p.q.coef[0]);
-            p.cp = elementFromString(h, p.attr).powZn(p.q.coef[0]);
+            Element coe = p.q.coefficients.get(0);
+            p.c = pub.g.duplicate().powZn(coe);
+            p.cp = elementFromString(h, p.attr).powZn(coe);
         } else {
-            Element r = pairing.getZr().newElement();
-            Element t = pairing.getZr().newElement();
             int i = 0;
             for (BswabePolicy policy : p.children) {
-                r.set(i + 1);
-                evalPoly(t, p.q, r);
+                Element r = pairing.getZr().newElement(i + 1);
+                Element t = evalPoly(p.q, r);
                 fillPolicy(policy, pub, t);
                 i++;
             }
@@ -362,25 +360,26 @@ public class Bswabe {
 
     }
 
-    private static void evalPoly(Element r, BswabePolynomial q, Element x) {
-        Element t = r.duplicate().setToOne();
-        r.setToZero();
+    private static Element evalPoly(BswabePolynomial q, Element x) {
+        Element t = x.duplicate().setToOne();
+        Element r = x.duplicate().setToZero();
 
-        /* r += q->coef[i] * t */
-        Arrays.stream(q.coef)
-                .map(s -> s.duplicate().mul(t))
-                .forEach(r::add);
+        for (Element coe : q.coefficients) {
+            Element s = coe.duplicate().mul(t);
+            r.add(s);
+            t.mul(x);
+        }
+
+        return r;
     }
 
     private static BswabePolynomial randPoly(int deg, Element zeroVal) {
-        Element[] coef = new Element[deg + 1];
-        Arrays.setAll(coef, i -> zeroVal.duplicate().setToRandom());
-        coef[0].set(zeroVal);
+        ArrayList<Element> coefficients = new ArrayList<>();
+        coefficients.add(zeroVal);
+        IntStream.range(0, deg).forEach(i -> coefficients.add(zeroVal.duplicate().setToRandom()));
 
         BswabePolynomial q = new BswabePolynomial();
-        q.deg = deg;
-        q.coef = coef;
-
+        q.coefficients = coefficients;
         return q;
     }
 
@@ -403,9 +402,9 @@ public class Bswabe {
                 } else if (k > n) {
                     throw ParseException.create(s, "unsatisfiable operator", tok);
                 } else if (n == 1) {
-                    throw ParseException.create(s, "indentity operator", tok);
+                    throw ParseException.create(s, "redundant operator", tok);
                 } else if (n > stack.size()) {
-                    throw ParseException.create(s, "stack underflow at");
+                    throw ParseException.create(s, "stack underflow at", tok);
                 }
 
                 /* pop n things and fill in children */

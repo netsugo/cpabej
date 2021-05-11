@@ -25,7 +25,7 @@ public class AESCoder {
             cipher.init(mode, skeySpec);
             return cipher.doFinal(data);
         } catch (Exception e) {
-            throw new AESException(e.getMessage(), e.getCause());
+            throw new AESException(e.getMessage(), e);
         }
     }
 

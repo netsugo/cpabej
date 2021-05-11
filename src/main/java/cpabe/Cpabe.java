@@ -47,7 +47,7 @@ public class Cpabe {
 
             return Common.packCpabe(cphBuf, aesBuf);
         } catch (Exception e) {
-            throw new EncryptException(e.getMessage(), e.getCause());
+            throw new EncryptException(e.getMessage(), e);
         }
     }
 
@@ -66,7 +66,7 @@ public class Cpabe {
             Element e = Bswabe.decrypt(pub, prv, cph);
             return AESCoder.decrypt(e.toBytes(), aesBuf);
         } catch (Exception e) {
-            throw new DecryptException(e.getMessage(), e.getCause());
+            throw new DecryptException(e.getMessage(), e);
         }
     }
 

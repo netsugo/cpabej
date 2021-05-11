@@ -2,8 +2,10 @@ package bswabe;
 
 import it.unisa.dia.gas.jpbc.Element;
 
+import java.util.ArrayList;
+
 public class BswabePolynomial {
-    public int deg;
     /* coefficients from [0] x^0 to [deg] x^deg */
-    public Element[] coef; /* G_T (of length deg+1) */
+    /* G_T (of length deg+1) */
+    public ArrayList<Element> coefficients;
 }
