@@ -100,67 +100,46 @@ public class Bswabe {
      * Delegate a subset of attribute of an existing private key.
      */
     public static BswabePrv delegate(BswabePub pub, BswabePrv prv_src, String[] attrs_subset) throws NoSuchAlgorithmException, IllegalArgumentException {
-        BswabePrv prv = new BswabePrv();
-
-        /* initialize */
         Pairing pairing = pub.p;
-        prv.d = pairing.getG2().newElement();
 
-        Element g_rt = pairing.getG2().newElement();
-        Element rt = pairing.getZr().newElement();
-        Element f_at_rt = pairing.getZr().newElement();
+        Element rt = pairing.getZr().newRandomElement();
+        Element f_at_rt = pub.f.duplicate().powZn(rt);
+        Element g_rt = pub.g.duplicate().powZn(rt);
 
-        /* compute */
-        rt.setToRandom();
-        f_at_rt = pub.f.duplicate();
-        f_at_rt.powZn(rt);
-        prv.d = prv_src.d.duplicate();
-        prv.d.mul(f_at_rt);
-
-        g_rt = pub.g.duplicate();
-        g_rt.powZn(rt);
-
-        prv.comps = new ArrayList<>();
+        Element prv_d = prv_src.d.duplicate().mul(f_at_rt);
+        ArrayList<BswabePrvComp> prv_comps = new ArrayList<>();
 
         for (String s : attrs_subset) {
-            BswabePrvComp comp = new BswabePrvComp();
-            comp.attr = s;
+            BswabePrvComp comp_src = searchBswabePrvComp(s, prv_src);
+            if (comp_src == null) throw new IllegalArgumentException("comp_src == null");
 
-            BswabePrvComp comp_src = new BswabePrvComp();
-            boolean comp_src_init = false;
-
-            for (BswabePrvComp bswabePrvComp : prv_src.comps) {
-                if (bswabePrvComp.attr.equals(comp.attr)) {
-                    comp_src = bswabePrvComp;
-                    comp_src_init = true;
-                }
-            }
-
-            if (!comp_src_init) throw new IllegalArgumentException("comp_src_init == false");
-
-            comp.d = pairing.getG2().newElement();
-            comp.dp = pairing.getG1().newElement();
             Element h_rtp = pairing.getG2().newElement();
-            Element rtp = pairing.getZr().newElement();
-
-            elementFromString(h_rtp, comp.attr);
-            rtp.setToRandom();
-
+            elementFromString(h_rtp, s);
+            Element rtp = pairing.getZr().newRandomElement();
             h_rtp.powZn(rtp);
 
-            comp.d = g_rt.duplicate();
-            comp.d.mul(h_rtp);
-            comp.d.mul(comp_src.d);
+            BswabePrvComp comp = new BswabePrvComp();
+            comp.attr = s;
+            comp.d = g_rt.duplicate().mul(h_rtp).mul(comp_src.d);
+            comp.dp = pub.g.duplicate().powZn(rtp).mul(comp_src.dp);
 
-            comp.dp = pub.g.duplicate();
-            comp.dp.powZn(rtp);
-            comp.dp.mul(comp_src.dp);
-
-
-            prv.comps.add(comp);
+            prv_comps.add(comp);
         }
 
+        BswabePrv prv = new BswabePrv();
+        prv.d = prv_d;
+        prv.comps = prv_comps;
+
         return prv;
+    }
+
+    private static BswabePrvComp searchBswabePrvComp(String attr, BswabePrv prv_src) {
+        for (BswabePrvComp bswabePrvComp : prv_src.comps) {
+            if (bswabePrvComp.attr.equals(attr)) {
+                return bswabePrvComp;
+            }
+        }
+        return null;
     }
 
     /*
