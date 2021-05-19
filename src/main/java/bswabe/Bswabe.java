@@ -1,10 +1,10 @@
 package bswabe;
 
-import it.unisa.dia.gas.jpbc.CurveParameters;
 import it.unisa.dia.gas.jpbc.Element;
 import it.unisa.dia.gas.jpbc.Pairing;
-import it.unisa.dia.gas.plaf.jpbc.pairing.DefaultCurveParameters;
+import it.unisa.dia.gas.jpbc.PairingParameters;
 import it.unisa.dia.gas.plaf.jpbc.pairing.PairingFactory;
+import it.unisa.dia.gas.plaf.jpbc.pairing.parameters.PropertiesParameters;
 
 import java.io.ByteArrayInputStream;
 import java.security.MessageDigest;
@@ -27,7 +27,7 @@ public class Bswabe {
             + "exp2 159\n" + "exp1 107\n" + "sign1 1\n" + "sign0 1\n";
 
     private static Pairing createPairing() {
-        CurveParameters params = new DefaultCurveParameters()
+        PairingParameters params = new PropertiesParameters()
                 .load(new ByteArrayInputStream(curveParams.getBytes()));
         return PairingFactory.getPairing(params);
     }

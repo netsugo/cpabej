@@ -2,6 +2,10 @@ plugins {
     id 'java'
 }
 
+ext {
+    jpbc = '2.0.0'
+}
+
 group 'com.github.netsugo'
 version '0.1.0'
 
@@ -13,8 +17,9 @@ repositories {
 }
 
 dependencies {
-    implementation 'it.unisa.dia.gas:jpbc-api:1.2.1'
-    implementation 'it.unisa.dia.gas:jpbc-plaf:1.2.1'
+    implementation "it.unisa.dia.gas:jpbc-api:$jpbc"
+    implementation "it.unisa.dia.gas:jpbc-pbc:$jpbc"
+    implementation "it.unisa.dia.gas:jpbc-plaf:$jpbc"
 
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.6.0'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'

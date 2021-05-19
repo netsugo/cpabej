@@ -1,11 +1,11 @@
 package bswabe;
 
-import it.unisa.dia.gas.jpbc.CurveParameters;
 import it.unisa.dia.gas.jpbc.Element;
 import it.unisa.dia.gas.jpbc.Field;
 import it.unisa.dia.gas.jpbc.Pairing;
-import it.unisa.dia.gas.plaf.jpbc.pairing.DefaultCurveParameters;
+import it.unisa.dia.gas.jpbc.PairingParameters;
 import it.unisa.dia.gas.plaf.jpbc.pairing.PairingFactory;
+import it.unisa.dia.gas.plaf.jpbc.pairing.parameters.PropertiesParameters;
 
 import java.io.*;
 import java.nio.ByteBuffer;
@@ -79,7 +79,7 @@ public class SerializeUtils {
         try {
             String paringDesc = unserializeString(stream);
 
-            CurveParameters params = new DefaultCurveParameters()
+            PairingParameters params = new PropertiesParameters()
                     .load(new ByteArrayInputStream(paringDesc.getBytes()));
             Pairing pairing = PairingFactory.getPairing(params);
 
