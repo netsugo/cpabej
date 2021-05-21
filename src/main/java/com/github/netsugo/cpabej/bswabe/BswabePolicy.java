@@ -1,4 +1,4 @@
-package bswabe;
+package com.github.netsugo.cpabej.bswabe;
 
 import it.unisa.dia.gas.jpbc.Element;
 
@@ -23,5 +23,5 @@ public class BswabePolicy {
     public boolean satisfiable;
     public int min_leaves;
     public int attri;
-    public ArrayList<Integer> satl = new ArrayList<Integer>();
+    public ArrayList<Integer> satl = new ArrayList<>();
 }

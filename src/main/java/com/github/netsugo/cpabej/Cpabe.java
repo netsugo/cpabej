@@ -1,6 +1,6 @@
-package cpabe;
+package com.github.netsugo.cpabej;
 
-import bswabe.*;
+import com.github.netsugo.cpabej.bswabe.*;
 import it.unisa.dia.gas.jpbc.Element;
 
 import java.security.NoSuchAlgorithmException;

@@ -1,4 +1,4 @@
-package bswabe;
+package com.github.netsugo.cpabej.bswabe;
 
 import java.security.GeneralSecurityException;
 

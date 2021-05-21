@@ -1,5 +1,5 @@
-import cpabe.Cpabe;
-import cpabe.EncryptException;
+import com.github.netsugo.cpabej.Cpabe;
+import com.github.netsugo.cpabej.EncryptException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

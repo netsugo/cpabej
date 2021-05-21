@@ -1,4 +1,4 @@
-package bswabe;
+package com.github.netsugo.cpabej.bswabe;
 
 import it.unisa.dia.gas.jpbc.Element;
 

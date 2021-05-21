@@ -1,6 +1,6 @@
-package cpabe;
+package com.github.netsugo.cpabej;
 
-import bswabe.SerializeUtils;
+import com.github.netsugo.cpabej.bswabe.SerializeUtils;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;

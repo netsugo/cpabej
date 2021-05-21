@@ -1,4 +1,4 @@
-package cpabe;
+package com.github.netsugo.cpabej;
 
 import java.security.GeneralSecurityException;
 

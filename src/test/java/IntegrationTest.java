@@ -1,5 +1,5 @@
-import cpabe.Cpabe;
-import cpabe.DecryptException;
+import com.github.netsugo.cpabej.Cpabe;
+import com.github.netsugo.cpabej.DecryptException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 

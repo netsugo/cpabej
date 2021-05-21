@@ -1,18 +1,19 @@
 plugins {
     id 'java'
+    id 'com.github.johnrengelman.shadow' version '5.2.0'
 }
 
 ext {
     jpbc = '2.0.0'
 }
 
-group 'com.github.netsugo'
+group 'com.github.netsugo.cpabej'
 version '0.1.0'
 
 repositories {
     mavenCentral()
     flatDir {
-        dirs "lib"
+        dirs 'lib'
     }
 }
 
